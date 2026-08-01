@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// NovaLearn – Datenzugriff pro anonymem Besucher gescoped (Plan Abschnitt 9).
+// "demo-public" ist der ownerId-Sentinel des vorbefüllten Beispiel-Kurses:
+// global lesbar, aber von niemandem editierbar (keine echte Anonymous-Auth-uid
+// wird jemals gleich diesem String sein).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function courseOwnerId(courseId) {
+      return get(/databases/$(database)/documents/courses/$(courseId)).data.ownerId;
+    }
+
+    match /courses/{courseId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid || resource.data.ownerId == "demo-public");
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // Deckt sources/, chunks/, topics/, topics/{id}/questions/,
+      // .../questions/{id}/attempts/ in beliebiger Tiefe mit einer Regel ab.
+      match /{document=**} {
+        allow read: if isSignedIn() &&
+          (courseOwnerId(courseId) == request.auth.uid || courseOwnerId(courseId) == "demo-public");
+        allow write: if isSignedIn() && courseOwnerId(courseId) == request.auth.uid;
+      }
+    }
+  }
+}

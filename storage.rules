@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// NovaLearn – hochgeladene PDFs liegen unter uploads/{uid}/... (Plan Abschnitt 9),
+// pro anonymem Besucher gescoped. demo/ ist das global lesbare, nicht
+// überschreibbare Material des Beispiel-Kurses.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /uploads/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /demo/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
