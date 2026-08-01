@@ -29,6 +29,7 @@ export async function saveChunks(
         text: chunk.text,
         embedding: chunk.embedding,
         pageRef: chunk.pageRef,
+        pageNumbers: chunk.pageNumbers,
       };
       batch.set(ref, value);
     }

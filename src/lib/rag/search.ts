@@ -5,8 +5,10 @@ export type SearchableChunk = {
   id: string;
   text: string;
   embedding: number[];
+  sourceId: string;
   sourceFileName: string;
   pageRef: string | null;
+  pageNumbers: number[];
 };
 
 export function cosineSimilarity(a: number[], b: number[]): number {

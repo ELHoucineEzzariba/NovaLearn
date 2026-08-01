@@ -7,6 +7,7 @@
 import { Type } from "@google/genai";
 import { gemini, GEMINI_TEXT_MODEL } from "@/lib/gemini/client";
 import { enqueueGeminiCall } from "@/lib/gemini/queue";
+import { buildMultimodalContents, type ImageInput } from "@/lib/gemini/multimodal";
 
 export type TopicChunkInput = { id: string; text: string; pageRef: string | null };
 
@@ -64,10 +65,14 @@ const RESPONSE_SCHEMA = {
   required: ["topics"],
 };
 
-function buildPrompt(chunks: TopicChunkInput[]): string {
+function buildPrompt(chunks: TopicChunkInput[], hasImages: boolean): string {
   const body = chunks
     .map((c) => `[chunk_id: ${c.id}${c.pageRef ? " | " + c.pageRef : ""}]\n${c.text}`)
     .join("\n\n");
+
+  const imageNote = hasImages
+    ? "\n\nZusätzlich zum Text bekommst du Screenshots der Kursfolien angehängt (Diagramme, Schaubilder, Grafiken) – beziehe deren Inhalt mit ein, falls sie für ein Thema relevant sind."
+    : "";
 
   return `Du bist ein Lernassistent, der Kursmaterial analysiert, um klausurrelevante Themen mit nachvollziehbarer Begründung zu extrahieren.
 
@@ -77,17 +82,20 @@ Analysiere die folgenden Text-Chunks eines Kurses und identifiziere die zentrale
 - relevanceScore: 0-100, wie wahrscheinlich klausurrelevant
 - relevanceReasoning: kurze, KONKRETE Begründung auf Deutsch (kein generischer Textbaustein), basierend auf: Wiederholung im Material, expliziten Markern ("wichtig", "klausurrelevant" o.ä.), struktureller Position (eigene Kapitelüberschrift vs. Randnotiz)
 - relevanceSignals: nur die tatsächlich zutreffenden Signale aus [${RELEVANCE_SIGNALS.join(", ")}]
-- chunkIds: die chunk_id-Werte der Chunks, die zu diesem Thema gehören (exakt wie unten angegeben, keine erfundenen IDs)
+- chunkIds: die chunk_id-Werte der Chunks, die zu diesem Thema gehören (exakt wie unten angegeben, keine erfundenen IDs)${imageNote}
 
 Chunks:
 ${body}`;
 }
 
-export async function extractTopics(chunks: TopicChunkInput[]): Promise<ExtractedTopic[]> {
+export async function extractTopics(
+  chunks: TopicChunkInput[],
+  images: ImageInput[] = [],
+): Promise<ExtractedTopic[]> {
   const response = await enqueueGeminiCall(() =>
     gemini.models.generateContent({
       model: GEMINI_TEXT_MODEL,
-      contents: buildPrompt(chunks),
+      contents: buildMultimodalContents(buildPrompt(chunks, images.length > 0), images),
       config: {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,

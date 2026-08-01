@@ -4,9 +4,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Loader2, BookOpen } from "lucide-react";
+import { Plus, Loader2, BookOpen, Trash2, X } from "lucide-react";
 import { useAuthUser } from "@/components/providers/AuthProvider";
-import { createCourse, listCoursesForUser, DEMO_OWNER_ID } from "@/lib/firestore/courses";
+import { createCourse, deleteCourse, listCoursesForUser, DEMO_OWNER_ID } from "@/lib/firestore/courses";
 import type { Course } from "@/types/course";
 
 export default function CoursesPage() {
@@ -15,6 +15,8 @@ export default function CoursesPage() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -34,6 +36,20 @@ export default function CoursesPage() {
       setLoadError(err instanceof Error ? err.message : "Kurs konnte nicht angelegt werden.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDelete(courseId: string) {
+    if (!uid) return;
+    setDeletingId(courseId);
+    try {
+      await deleteCourse(uid, courseId);
+      setCourses((prev) => (prev ?? []).filter((c) => c.id !== courseId));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Kurs konnte nicht gelöscht werden.");
+    } finally {
+      setDeletingId(null);
+      setConfirmingDeleteId(null);
     }
   }
 
@@ -79,24 +95,60 @@ export default function CoursesPage() {
       {loadError && <p className="mt-4 text-sm text-red-600">{loadError}</p>}
 
       <ul className="mt-8 space-y-2">
-        {(courses ?? []).map((course) => (
-          <li key={course.id}>
-            <Link
-              href={`/courses/${course.id}`}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm transition-colors hover:border-[#8A38EC]/40 hover:bg-slate-50"
+        {(courses ?? []).map((course) => {
+          const isDemo = course.ownerId === DEMO_OWNER_ID;
+          const isConfirming = confirmingDeleteId === course.id;
+          const isDeleting = deletingId === course.id;
+
+          return (
+            <li
+              key={course.id}
+              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm transition-colors hover:border-[#8A38EC]/40 hover:bg-slate-50"
             >
-              <span className="flex items-center gap-2 font-medium text-slate-900">
-                <BookOpen className="h-4 w-4 text-slate-400" strokeWidth={2} />
-                {course.name}
-              </span>
-              {course.ownerId === DEMO_OWNER_ID && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                  Beispiel-Kurs
-                </span>
+              <Link href={`/courses/${course.id}`} className="flex min-w-0 flex-1 items-center gap-2">
+                <BookOpen className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2} />
+                <span className="truncate font-medium text-slate-900">{course.name}</span>
+                {isDemo && (
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                    Beispiel-Kurs
+                  </span>
+                )}
+              </Link>
+
+              {!isDemo && (
+                <div className="flex shrink-0 items-center gap-2">
+                  {isConfirming ? (
+                    <>
+                      <span className="text-xs text-slate-500">Wirklich löschen?</span>
+                      <button
+                        onClick={() => handleDelete(course.id)}
+                        disabled={isDeleting}
+                        className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Löschen"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmingDeleteId(null)}
+                        disabled={isDeleting}
+                        className="rounded-full p-1 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-3.5 w-3.5" strokeWidth={2.25} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingDeleteId(course.id)}
+                      className="rounded-full p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600"
+                      title="Kurs löschen"
+                    >
+                      <Trash2 className="h-4 w-4" strokeWidth={2} />
+                    </button>
+                  )}
+                </div>
               )}
-            </Link>
-          </li>
-        ))}
+            </li>
+          );
+        })}
         {courses !== null && courses.length === 0 && (
           <li className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
             Noch keine Kurse – leg oben deinen ersten an.

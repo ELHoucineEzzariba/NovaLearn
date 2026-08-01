@@ -4,6 +4,7 @@
 import { Type } from "@google/genai";
 import { gemini, GEMINI_TEXT_MODEL } from "@/lib/gemini/client";
 import { enqueueGeminiCall } from "@/lib/gemini/queue";
+import { buildMultimodalContents, type ImageInput } from "@/lib/gemini/multimodal";
 import type { QuestionType } from "@/types/question";
 
 export type GeneratedQuestion = { questionType: QuestionType; questionText: string };
@@ -30,13 +31,19 @@ export async function generateQuestions(params: {
   topicTitle: string;
   topicDescription: string;
   chunkTexts: string[];
+  images?: ImageInput[];
 }): Promise<GeneratedQuestion[]> {
-  const { topicTitle, topicDescription, chunkTexts } = params;
+  const { topicTitle, topicDescription, chunkTexts, images = [] } = params;
+
+  const imageNote =
+    images.length > 0
+      ? "\n\nZusätzlich sind Screenshots der zugehörigen Folien angehängt (Diagramme/Schaubilder) – stell bei Bedarf auch Fragen dazu."
+      : "";
 
   const prompt = `Du bist ein Lernassistent. Erstelle zu folgendem Thema genau drei Freitext-Übungsfragen auf Deutsch: eine Definitionsfrage (questionType "definition", fragt nach Begriff/Konzept), eine Anwendungsfrage (questionType "anwendung", verlangt Anwendung des Konzepts auf ein konkretes Beispiel) und eine Transferfrage (questionType "transfer", verlangt Übertragung auf einen neuen Kontext oder Vergleich mit einem verwandten Konzept). Die Fragen müssen mit Freitext beantwortbar sein, kein Multiple-Choice.
 
 Thema: ${topicTitle}
-Beschreibung: ${topicDescription}
+Beschreibung: ${topicDescription}${imageNote}
 
 Relevantes Kursmaterial:
 ${chunkTexts.join("\n\n")}`;
@@ -44,7 +51,7 @@ ${chunkTexts.join("\n\n")}`;
   const response = await enqueueGeminiCall(() =>
     gemini.models.generateContent({
       model: GEMINI_TEXT_MODEL,
-      contents: prompt,
+      contents: buildMultimodalContents(prompt, images),
       config: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA },
     }),
   );

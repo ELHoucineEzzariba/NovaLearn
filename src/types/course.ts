@@ -26,4 +26,19 @@ export type CourseChunk = {
   text: string;
   embedding: number[];
   pageRef: string | null;
+  pageNumbers: number[]; // für die Zuordnung zu CoursePageImage (visueller Kontext)
+};
+
+// Seiten-Screenshot (Erweiterung ggü. Plan): visueller Kontext für Diagramme
+// und Schaubilder, die reine Text-Extraktion nicht erfasst (z.B.
+// vektorgezeichnete Schaubilder ohne eingebettetes Rasterbild). Eine pro
+// Seite statt pro Chunk, damit mehrere Chunks derselben Seite sich das Bild
+// teilen (kein redundantes Speichern).
+export type CoursePageImage = {
+  id: string; // `${sourceId}_${pageNumber}`
+  courseId: string;
+  sourceId: string;
+  pageNumber: number;
+  mimeType: string;
+  dataBase64: string;
 };

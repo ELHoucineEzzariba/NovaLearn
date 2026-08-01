@@ -2,8 +2,18 @@
 // DEMO_OWNER_ID ist der Sentinel des vorbefüllten, global lesbaren aber
 // nicht editierbaren Beispiel-Kurses (siehe firestore.rules).
 
-import { addDoc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { coursesCol, courseDoc } from "./paths";
+import { addDoc, deleteDoc, getDoc, getDocs, query, where, writeBatch, type CollectionReference } from "firebase/firestore";
+import { ref, listAll, deleteObject } from "firebase/storage";
+import { db, storage } from "@/lib/firebase/client";
+import {
+  coursesCol,
+  courseDoc,
+  sourcesCol,
+  chunksCol,
+  topicsCol,
+  questionsCol,
+  attemptsCol,
+} from "./paths";
 import type { Course } from "@/types/course";
 
 export const DEMO_OWNER_ID = "demo-public";
@@ -36,4 +46,47 @@ export async function listCoursesForUser(uid: string): Promise<Course[]> {
 export async function getCourse(courseId: string): Promise<Course | null> {
   const snap = await getDoc(courseDoc(courseId));
   return snap.exists() ? snap.data() : null;
+}
+
+const BATCH_LIMIT = 400;
+
+async function deleteAllDocs(col: CollectionReference): Promise<void> {
+  const snap = await getDocs(col);
+  for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + BATCH_LIMIT).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+/**
+ * Löscht einen Kurs vollständig: alle Subcollections (sources, chunks,
+ * topics inkl. deren questions/attempts), die hochgeladenen PDFs in Storage
+ * und zuletzt das Kurs-Dokument selbst. Firestore kennt kein kaskadierendes
+ * Löschen im Client-SDK, daher hier manuell – Reihenfolge wichtig: das
+ * Kurs-Dokument muss zuletzt gelöscht werden, weil firestore.rules beim
+ * Löschen der Subcollection-Dokumente per get() den ownerId vom noch
+ * existierenden Kurs-Dokument prüft.
+ */
+export async function deleteCourse(uid: string, courseId: string): Promise<void> {
+  const topicsSnap = await getDocs(topicsCol(courseId));
+  for (const topicSnap of topicsSnap.docs) {
+    const questionsSnap = await getDocs(questionsCol(courseId, topicSnap.id));
+    for (const questionSnap of questionsSnap.docs) {
+      await deleteAllDocs(attemptsCol(courseId, topicSnap.id, questionSnap.id));
+    }
+    await deleteAllDocs(questionsCol(courseId, topicSnap.id));
+  }
+  await deleteAllDocs(topicsCol(courseId));
+  await deleteAllDocs(chunksCol(courseId));
+  await deleteAllDocs(sourcesCol(courseId));
+  await deleteDoc(courseDoc(courseId));
+
+  try {
+    const folderRef = ref(storage, `uploads/${uid}/${courseId}`);
+    const listing = await listAll(folderRef);
+    await Promise.all(listing.items.map((item) => deleteObject(item)));
+  } catch (err) {
+    console.warn("[deleteCourse] Storage-Dateien konnten nicht vollständig entfernt werden:", err);
+  }
 }

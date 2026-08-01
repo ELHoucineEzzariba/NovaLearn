@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   try {
     const embedded = await embedChunks(rawChunks);
-    return NextResponse.json({ chunks: embedded });
+    return NextResponse.json({ chunks: embedded, screenshots: extracted.screenshots });
   } catch (err) {
     console.error("[upload] Embedding fehlgeschlagen:", err);
     return NextResponse.json({ error: "embedding_failed" }, { status: 502 });

@@ -6,7 +6,7 @@
 
 import type { ExtractedPage } from "./extractText";
 
-export type RawChunk = { text: string; pageRef: string | null };
+export type RawChunk = { text: string; pageRef: string | null; pageNumbers: number[] };
 
 const TARGET_CHUNK_SIZE = 1200;
 const MAX_CHUNK_SIZE = 1800;
@@ -42,7 +42,13 @@ export function chunkPages(pages: ExtractedPage[]): RawChunk[] {
 
   function flush() {
     const trimmed = buffer.trim();
-    if (trimmed) chunks.push({ text: trimmed, pageRef: pageRefLabel(bufferPages) });
+    if (trimmed) {
+      chunks.push({
+        text: trimmed,
+        pageRef: pageRefLabel(bufferPages),
+        pageNumbers: [...bufferPages].sort((a, b) => a - b),
+      });
+    }
     buffer = "";
     bufferPages = new Set();
   }
@@ -57,7 +63,11 @@ export function chunkPages(pages: ExtractedPage[]): RawChunk[] {
       if (paragraph.length > MAX_CHUNK_SIZE) {
         flush();
         for (const piece of splitLongParagraph(paragraph, MAX_CHUNK_SIZE)) {
-          chunks.push({ text: piece, pageRef: pageRefLabel(new Set([page.pageNumber])) });
+          chunks.push({
+            text: piece,
+            pageRef: pageRefLabel(new Set([page.pageNumber])),
+            pageNumbers: [page.pageNumber],
+          });
         }
         continue;
       }

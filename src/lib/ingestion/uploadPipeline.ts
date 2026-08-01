@@ -6,9 +6,11 @@
 
 import { newSourceId, createSource } from "@/lib/firestore/sources";
 import { saveChunks } from "@/lib/firestore/chunks";
+import { savePageImages } from "@/lib/firestore/pageImages";
 import { uploadCourseFile } from "@/lib/firebase/storage";
 import type { SourceType } from "@/types/course";
 import type { EmbeddedChunk } from "./embed";
+import type { PageScreenshot } from "./extractText";
 
 export type IngestionStage = "hochladen" | "verarbeiten" | "speichern" | "fertig";
 
@@ -42,11 +44,15 @@ export async function runIngestion(params: {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new IngestionError(body.error ?? "unknown");
   }
-  const { chunks } = (await res.json()) as { chunks: EmbeddedChunk[] };
+  const { chunks, screenshots } = (await res.json()) as {
+    chunks: EmbeddedChunk[];
+    screenshots: PageScreenshot[];
+  };
 
   onStage?.("speichern");
   await createSource({ sourceId, courseId, fileName: file.name, storagePath, type: sourceType });
   await saveChunks(courseId, sourceId, chunks);
+  await savePageImages(courseId, sourceId, screenshots);
 
   onStage?.("fertig");
 }

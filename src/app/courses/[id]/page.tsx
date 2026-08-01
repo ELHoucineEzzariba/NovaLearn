@@ -5,13 +5,15 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, MessageCircle, Sparkles, Percent } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, MessageCircle, Sparkles, Percent, Trash2 } from "lucide-react";
 import { useAuthUser } from "@/components/providers/AuthProvider";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { TopicCard } from "@/components/topics/TopicCard";
-import { getCourse } from "@/lib/firestore/courses";
+import { getCourse, deleteCourse, DEMO_OWNER_ID } from "@/lib/firestore/courses";
 import { listSources } from "@/lib/firestore/sources";
 import { listChunks } from "@/lib/firestore/chunks";
+import { listPageImages } from "@/lib/firestore/pageImages";
 import { hasTopics, listTopics, saveTopics } from "@/lib/firestore/topics";
 import type { Course, CourseSource } from "@/types/course";
 import type { Topic } from "@/types/topic";
@@ -24,6 +26,7 @@ export default function CourseDashboardPage({
 }) {
   const { id: courseId } = use(params);
   const { uid } = useAuthUser();
+  const router = useRouter();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [sources, setSources] = useState<CourseSource[]>([]);
@@ -31,6 +34,8 @@ export default function CourseDashboardPage({
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function triggerRefresh() {
     setRefreshKey((k) => k + 1);
@@ -68,12 +73,13 @@ export default function CourseDashboardPage({
         return;
       }
 
-      const chunks = await listChunks(courseId);
+      const [chunks, pageImages] = await Promise.all([listChunks(courseId), listPageImages(courseId)]);
       const res = await fetch(`/api/courses/${courseId}/topics/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chunks: chunks.map((c) => ({ id: c.id, text: c.text, pageRef: c.pageRef })),
+          images: pageImages.map((img) => ({ mimeType: img.mimeType, dataBase64: img.dataBase64 })),
         }),
       });
       if (!res.ok) throw new Error("Themenextraktion fehlgeschlagen.");
@@ -87,6 +93,19 @@ export default function CourseDashboardPage({
       setGenerateError(err instanceof Error ? err.message : "Unbekannter Fehler.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleDeleteCourse() {
+    if (!uid) return;
+    setDeleting(true);
+    try {
+      await deleteCourse(uid, courseId);
+      router.push("/courses");
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Kurs konnte nicht gelöscht werden.");
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   }
 
@@ -111,13 +130,44 @@ export default function CourseDashboardPage({
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">{course.name}</h1>
         </div>
-        <Link
-          href={`/courses/${courseId}/chat`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <MessageCircle className="h-4 w-4" strokeWidth={2.25} />
-          Chat
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/courses/${courseId}/chat`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <MessageCircle className="h-4 w-4" strokeWidth={2.25} />
+            Chat
+          </Link>
+
+          {course.ownerId !== DEMO_OWNER_ID &&
+            (confirmingDelete ? (
+              <div className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5">
+                <span className="text-xs text-red-700">Kurs wirklich löschen?</span>
+                <button
+                  onClick={handleDeleteCourse}
+                  disabled={deleting}
+                  className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Löschen"}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-2 text-sm text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                title="Kurs löschen"
+              >
+                <Trash2 className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ))}
+        </div>
       </div>
 
       {overallProgress !== null && (

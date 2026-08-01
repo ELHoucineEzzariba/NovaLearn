@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { generateQuestions } from "@/lib/practice/generateQuestions";
 import { evaluateAnswer } from "@/lib/practice/evaluateAnswer";
+import type { ImageInput } from "@/lib/gemini/multimodal";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,6 +15,7 @@ type GenerateBody = {
   topicTitle: string;
   topicDescription: string;
   chunkTexts: string[];
+  images?: ImageInput[];
 };
 
 type EvaluateBody = {
@@ -21,6 +23,7 @@ type EvaluateBody = {
   questionText: string;
   chunkTexts: string[];
   userAnswer: string;
+  images?: ImageInput[];
 };
 
 export async function POST(request: Request) {

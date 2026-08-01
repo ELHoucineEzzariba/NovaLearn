@@ -5,13 +5,14 @@
 import { collection, doc, type CollectionReference, type DocumentReference } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { makeConverter } from "./converter";
-import type { Course, CourseSource, CourseChunk } from "@/types/course";
+import type { Course, CourseSource, CourseChunk, CoursePageImage } from "@/types/course";
 import type { Topic } from "@/types/topic";
 import type { Question, QuestionAttempt } from "@/types/question";
 
 const coursesConverter = makeConverter<Course>();
 const sourcesConverter = makeConverter<CourseSource>();
 const chunksConverter = makeConverter<CourseChunk>();
+const pageImagesConverter = makeConverter<CoursePageImage>();
 const topicsConverter = makeConverter<Topic>();
 const questionsConverter = makeConverter<Question>();
 const attemptsConverter = makeConverter<QuestionAttempt>();
@@ -34,6 +35,10 @@ export function sourceDoc(courseId: string, sourceId: string): DocumentReference
 
 export function chunksCol(courseId: string): CollectionReference<CourseChunk> {
   return collection(courseDoc(courseId), "chunks").withConverter(chunksConverter);
+}
+
+export function pageImagesCol(courseId: string): CollectionReference<CoursePageImage> {
+  return collection(courseDoc(courseId), "pageImages").withConverter(pageImagesConverter);
 }
 
 export function topicsCol(courseId: string): CollectionReference<Topic> {

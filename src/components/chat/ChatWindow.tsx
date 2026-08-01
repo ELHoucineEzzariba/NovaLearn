@@ -6,8 +6,17 @@ import { useRef, useState } from "react";
 import { Send, Loader2 } from "lucide-react";
 import { ChatMessage, type ChatMessageData } from "./ChatMessage";
 import type { SearchableChunk } from "@/lib/rag/search";
+import type { CoursePageImage } from "@/types/course";
 
-export function ChatWindow({ courseId, chunks }: { courseId: string; chunks: SearchableChunk[] }) {
+export function ChatWindow({
+  courseId,
+  chunks,
+  pageImages,
+}: {
+  courseId: string;
+  chunks: SearchableChunk[];
+  pageImages: CoursePageImage[];
+}) {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -27,7 +36,7 @@ export function ChatWindow({ courseId, chunks }: { courseId: string; chunks: Sea
       const res = await fetch(`/api/courses/${courseId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, chunks }),
+        body: JSON.stringify({ question, chunks, pageImages }),
       });
       if (!res.ok) throw new Error("Antwort fehlgeschlagen.");
       const data = (await res.json()) as { answer: string; citations: ChatMessageData["citations"] };

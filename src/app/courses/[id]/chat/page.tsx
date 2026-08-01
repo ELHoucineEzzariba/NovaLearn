@@ -9,9 +9,10 @@ import { useAuthUser } from "@/components/providers/AuthProvider";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { listChunks } from "@/lib/firestore/chunks";
 import { listSources } from "@/lib/firestore/sources";
+import { listPageImages } from "@/lib/firestore/pageImages";
 import { getCourse } from "@/lib/firestore/courses";
 import type { SearchableChunk } from "@/lib/rag/search";
-import type { Course } from "@/types/course";
+import type { Course, CoursePageImage } from "@/types/course";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: courseId } = use(params);
@@ -19,24 +20,31 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const [course, setCourse] = useState<Course | null>(null);
   const [chunks, setChunks] = useState<SearchableChunk[] | null>(null);
+  const [pageImages, setPageImages] = useState<CoursePageImage[]>([]);
 
   useEffect(() => {
     if (!uid) return;
-    Promise.all([getCourse(courseId), listChunks(courseId), listSources(courseId)]).then(
-      ([courseData, chunkData, sourceData]) => {
-        setCourse(courseData);
-        const fileNameBySourceId = new Map(sourceData.map((s) => [s.id, s.fileName]));
-        setChunks(
-          chunkData.map((c) => ({
-            id: c.id,
-            text: c.text,
-            embedding: c.embedding,
-            pageRef: c.pageRef,
-            sourceFileName: fileNameBySourceId.get(c.sourceId) ?? "Unbekannte Quelle",
-          })),
-        );
-      },
-    );
+    Promise.all([
+      getCourse(courseId),
+      listChunks(courseId),
+      listSources(courseId),
+      listPageImages(courseId),
+    ]).then(([courseData, chunkData, sourceData, pageImageData]) => {
+      setCourse(courseData);
+      setPageImages(pageImageData);
+      const fileNameBySourceId = new Map(sourceData.map((s) => [s.id, s.fileName]));
+      setChunks(
+        chunkData.map((c) => ({
+          id: c.id,
+          text: c.text,
+          embedding: c.embedding,
+          sourceId: c.sourceId,
+          pageRef: c.pageRef,
+          pageNumbers: c.pageNumbers,
+          sourceFileName: fileNameBySourceId.get(c.sourceId) ?? "Unbekannte Quelle",
+        })),
+      );
+    });
   }, [uid, courseId]);
 
   if (!course || !chunks) {
@@ -60,7 +68,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </p>
       ) : (
         <div className="mt-6">
-          <ChatWindow courseId={courseId} chunks={chunks} />
+          <ChatWindow courseId={courseId} chunks={chunks} pageImages={pageImages} />
         </div>
       )}
     </div>

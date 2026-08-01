@@ -5,6 +5,7 @@
 import { Type } from "@google/genai";
 import { gemini, GEMINI_TEXT_MODEL } from "@/lib/gemini/client";
 import { enqueueGeminiCall } from "@/lib/gemini/queue";
+import { buildMultimodalContents, type ImageInput } from "@/lib/gemini/multimodal";
 import type { AiVerdict } from "@/types/question";
 
 const RESPONSE_SCHEMA = {
@@ -24,10 +25,16 @@ export async function evaluateAnswer(params: {
   questionText: string;
   chunkTexts: string[];
   userAnswer: string;
+  images?: ImageInput[];
 }): Promise<{ verdict: AiVerdict; feedback: string }> {
-  const { questionText, chunkTexts, userAnswer } = params;
+  const { questionText, chunkTexts, userAnswer, images = [] } = params;
 
-  const prompt = `Du bist ein Lernassistent, der Freitext-Antworten von Studierenden bewertet. Bewerte die Antwort AUSSCHLIESSLICH anhand des gegebenen Kursmaterials als "richtig", "teilweise" oder "falsch" und gib ein kurzes, konkretes Feedback auf Deutsch, das erklärt, was gefehlt hat oder bestätigt, was gut war.
+  const imageNote =
+    images.length > 0
+      ? "\n\nZusätzlich sind Screenshots der zugehörigen Folien angehängt – beziehe sie mit ein, falls die Frage oder Antwort sich auf ein Diagramm/Schaubild bezieht."
+      : "";
+
+  const prompt = `Du bist ein Lernassistent, der Freitext-Antworten von Studierenden bewertet. Bewerte die Antwort AUSSCHLIESSLICH anhand des gegebenen Kursmaterials als "richtig", "teilweise" oder "falsch" und gib ein kurzes, konkretes Feedback auf Deutsch, das erklärt, was gefehlt hat oder bestätigt, was gut war.${imageNote}
 
 Frage: ${questionText}
 
@@ -39,7 +46,7 @@ Antwort des Studierenden: ${userAnswer}`;
   const response = await enqueueGeminiCall(() =>
     gemini.models.generateContent({
       model: GEMINI_TEXT_MODEL,
-      contents: prompt,
+      contents: buildMultimodalContents(prompt, images),
       config: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA },
     }),
   );

@@ -12,9 +12,11 @@ import { QuestionCard } from "@/components/practice/QuestionCard";
 import { ProgressBadge } from "@/components/ui/ProgressBadge";
 import { getTopic } from "@/lib/firestore/topics";
 import { listChunks } from "@/lib/firestore/chunks";
+import { listPageImages } from "@/lib/firestore/pageImages";
 import { hasQuestions, listQuestions, saveQuestions, recordAttempt } from "@/lib/firestore/practice";
 import type { Topic } from "@/types/topic";
 import type { Question, AiVerdict } from "@/types/question";
+import type { ImageInput } from "@/lib/gemini/multimodal";
 
 export default function TopicPracticePage({
   params,
@@ -26,6 +28,7 @@ export default function TopicPracticePage({
 
   const [topic, setTopic] = useState<Topic | null>(null);
   const [chunkTexts, setChunkTexts] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageInput[]>([]);
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +37,23 @@ export default function TopicPracticePage({
     if (!uid) return;
 
     async function load() {
-      const [topicData, allChunks] = await Promise.all([
+      const [topicData, allChunks, allPageImages] = await Promise.all([
         getTopic(courseId, topicId),
         listChunks(courseId),
+        listPageImages(courseId),
       ]);
       setTopic(topicData);
       const relevantChunks = allChunks.filter((c) => topicData?.chunkIds.includes(c.id));
       setChunkTexts(relevantChunks.map((c) => c.text));
+
+      const neededKeys = new Set(
+        relevantChunks.flatMap((c) => c.pageNumbers.map((n) => `${c.sourceId}_${n}`)),
+      );
+      setImages(
+        allPageImages
+          .filter((img) => neededKeys.has(`${img.sourceId}_${img.pageNumber}`))
+          .map((img) => ({ mimeType: img.mimeType, dataBase64: img.dataBase64 })),
+      );
 
       const existing = await hasQuestions(courseId, topicId);
       setQuestions(existing ? await listQuestions(courseId, topicId) : []);
@@ -62,6 +75,7 @@ export default function TopicPracticePage({
           topicTitle: topic.title,
           topicDescription: topic.description,
           chunkTexts,
+          images,
         }),
       });
       if (!res.ok) throw new Error("Fragen konnten nicht generiert werden.");
@@ -86,6 +100,7 @@ export default function TopicPracticePage({
         questionText: question.questionText,
         chunkTexts,
         userAnswer: answer,
+        images,
       }),
     });
     if (!res.ok) throw new Error("Bewertung fehlgeschlagen.");
