@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { extractPdfText, type ExtractedPage, type PageScreenshot } from "@/lib/ingestion/extractText";
-import { describePageImage } from "@/lib/ingestion/describeImages";
+import { describePageImages } from "@/lib/ingestion/describeImages";
 import { chunkPages } from "@/lib/ingestion/chunk";
 import { embedChunks } from "@/lib/ingestion/embed";
 
@@ -28,21 +28,25 @@ async function enrichSparsePages(
   screenshots: PageScreenshot[],
 ): Promise<ExtractedPage[]> {
   const screenshotByPage = new Map(screenshots.map((s) => [s.pageNumber, s]));
-
-  return Promise.all(
-    pages.map(async (page) => {
-      if (page.text.trim().length >= MIN_PAGE_TEXT_CHARS) return page;
-      const screenshot = screenshotByPage.get(page.pageNumber);
-      if (!screenshot) return page;
-      try {
-        const description = await describePageImage(screenshot);
-        return description ? { ...page, text: description } : page;
-      } catch (err) {
-        console.warn(`[upload] Bildbeschreibung für Seite ${page.pageNumber} fehlgeschlagen:`, err);
-        return page;
-      }
-    }),
+  const sparsePages = pages.filter(
+    (p) => p.text.trim().length < MIN_PAGE_TEXT_CHARS && screenshotByPage.has(p.pageNumber),
   );
+  if (sparsePages.length === 0) return pages;
+
+  let descriptions: Map<number, string>;
+  try {
+    descriptions = await describePageImages(
+      sparsePages.map((p) => screenshotByPage.get(p.pageNumber)!),
+    );
+  } catch (err) {
+    console.warn("[upload] Bildbeschreibung fehlgeschlagen:", err);
+    descriptions = new Map();
+  }
+
+  return pages.map((page) => {
+    const description = descriptions.get(page.pageNumber);
+    return description ? { ...page, text: description } : page;
+  });
 }
 
 export async function POST(request: Request) {
