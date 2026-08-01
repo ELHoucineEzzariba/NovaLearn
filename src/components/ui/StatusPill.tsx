@@ -5,6 +5,7 @@
 // alle exakt dasselbe visuelle Muster brauchen: Icon + farbiger Hintergrund
 // + Label (siehe Plan Abschnitt 6/7).
 
+import { createElement } from "react";
 import { resolveIcon, type IconName } from "@/lib/ui/icons";
 
 type StatusPillProps = {
@@ -16,7 +17,6 @@ type StatusPillProps = {
 };
 
 export function StatusPill({ icon, label, colorToken, size = "md", spin = false }: StatusPillProps) {
-  const Icon = resolveIcon(icon);
   const padding = size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm";
   const iconSize = size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5";
 
@@ -25,7 +25,10 @@ export function StatusPill({ icon, label, colorToken, size = "md", spin = false 
       className={`inline-flex items-center gap-1.5 rounded-full font-medium ${padding}`}
       style={{ color: colorToken.fg, background: colorToken.bg }}
     >
-      <Icon className={`${iconSize} ${spin ? "animate-spin" : ""}`} strokeWidth={2.25} />
+      {createElement(resolveIcon(icon), {
+        className: `${iconSize} ${spin ? "animate-spin" : ""}`,
+        strokeWidth: 2.25,
+      })}
       {label}
     </span>
   );

@@ -13,6 +13,10 @@ if (!process.env.GEMINI_API_KEY) {
 
 export const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Kostenloser Free-Tier deckt aktuell nur Flash/Flash-Lite ab (Plan Abschnitt 3).
-export const GEMINI_TEXT_MODEL = "gemini-2.5-flash";
+// "gemini-flash-latest" ist ein von Google gepflegter Alias auf das jeweils
+// aktuelle kostenlose Flash-Modell (Plan Abschnitt 3) – fest benannte
+// Versionen (z.B. "gemini-2.5-flash") werden von Google nach einer Weile für
+// neue API-Keys gesperrt ("no longer available to new users"), der Alias
+// bleibt dagegen dauerhaft nutzbar.
+export const GEMINI_TEXT_MODEL = "gemini-flash-latest";
 export const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
