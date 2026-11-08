@@ -5,6 +5,15 @@ Basiert auf `novalearn-detailed-plan.md` und dem bereits vorhandenen Logo
 eurem bestehenden Logo extrahiert, (2) ein Lucide-Icon-System für die im Plan
 spezifizierten Datentypen (Relevanz, Fortschritts-Ampel, Fragetypen, KI-Bewertung).
 
+
+## Tests & CI
+
+```bash
+npm test   # Vitest: Chunking, RAG-Retrieval, Quellenangaben, Gemini-Warteschlange
+```
+
+Getestet wird die Logik, auf der die Antworten des Lern-Chats beruhen: wie PDFs in Abschnitte zerlegt werden (`src/lib/ingestion/chunk.ts`), wie die passendsten Abschnitte gefunden werden (`src/lib/rag/search.ts`), dass Quellenangaben nur aus tatsächlich verwendeten Abschnitten entstehen (`src/lib/rag/buildContext.ts`) und dass Gemini-Aufrufe bei Rate-Limits sauber wiederholt werden (`src/lib/gemini/queue.ts`). GitHub Actions führt Typecheck und Tests bei jedem Push aus.
+
 ## Teil 1 – Icons & Bilder (aus eurem bestehenden Logo)
 
 Das Logo lag bisher nur als ein zusammengesetztes Referenzblatt vor (Hero-Motiv +
